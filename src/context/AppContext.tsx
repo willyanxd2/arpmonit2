@@ -35,6 +35,7 @@ interface AppState {
   notifications: Notification[];
   loading: boolean;
   networkInterfaces: string[];
+  showNotifications: boolean;
 }
 
 interface AppContextType extends AppState {
@@ -42,8 +43,12 @@ interface AppContextType extends AppState {
   fetchNotifications: () => Promise<void>;
   fetchNetworkInterfaces: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
   runJob: (id: string) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
+  addJob: (job: Job) => void;
+  toggleNotifications: () => void;
+  clearAllNotifications: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -52,7 +57,8 @@ const initialState: AppState = {
   jobs: [],
   notifications: [],
   loading: false,
-  networkInterfaces: []
+  networkInterfaces: [],
+  showNotifications: false
 };
 
 type Action = 
@@ -62,7 +68,11 @@ type Action =
   | { type: 'SET_NETWORK_INTERFACES'; payload: string[] }
   | { type: 'UPDATE_JOB'; payload: Job }
   | { type: 'DELETE_JOB'; payload: string }
-  | { type: 'MARK_NOTIFICATION_READ'; payload: string };
+  | { type: 'ADD_JOB'; payload: Job }
+  | { type: 'MARK_NOTIFICATION_READ'; payload: string }
+  | { type: 'MARK_ALL_NOTIFICATIONS_READ' }
+  | { type: 'TOGGLE_NOTIFICATIONS' }
+  | { type: 'CLEAR_ALL_NOTIFICATIONS' };
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -86,6 +96,11 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         jobs: state.jobs.filter(job => job.id !== action.payload)
       };
+    case 'ADD_JOB':
+      return {
+        ...state,
+        jobs: [action.payload, ...state.jobs]
+      };
     case 'MARK_NOTIFICATION_READ':
       return {
         ...state,
@@ -95,6 +110,15 @@ function appReducer(state: AppState, action: Action): AppState {
             : notification
         )
       };
+    case 'MARK_ALL_NOTIFICATIONS_READ':
+      return {
+        ...state,
+        notifications: state.notifications.map(notification => ({ ...notification, read: true }))
+      };
+    case 'TOGGLE_NOTIFICATIONS':
+      return { ...state, showNotifications: !state.showNotifications };
+    case 'CLEAR_ALL_NOTIFICATIONS':
+      return { ...state, notifications: [] };
     default:
       return state;
   }
@@ -142,6 +166,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const markAllNotificationsAsRead = async () => {
+    try {
+      // Mark all unread notifications as read
+      const unreadNotifications = state.notifications.filter(n => !n.read);
+      await Promise.all(
+        unreadNotifications.map(notification => 
+          api.patch(`/notifications/${notification.id}/read`)
+        )
+      );
+      dispatch({ type: 'MARK_ALL_NOTIFICATIONS_READ' });
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      toast.error('Failed to mark all notifications as read');
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    try {
+      // This would need a backend endpoint to delete all notifications
+      // For now, just mark them all as read
+      await markAllNotificationsAsRead();
+      dispatch({ type: 'CLEAR_ALL_NOTIFICATIONS' });
+      toast.success('All notifications cleared');
+    } catch (error) {
+      toast.error('Failed to clear notifications');
+    }
+  };
+
   const runJob = async (id: string) => {
     try {
       await api.post(`/jobs/${id}/run`);
@@ -160,6 +212,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       toast.error('Failed to delete job');
     }
+  };
+
+  const addJob = (job: Job) => {
+    dispatch({ type: 'ADD_JOB', payload: job });
+  };
+
+  const toggleNotifications = () => {
+    dispatch({ type: 'TOGGLE_NOTIFICATIONS' });
   };
 
   useEffect(() => {
@@ -182,8 +242,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchNotifications,
     fetchNetworkInterfaces,
     markNotificationAsRead,
+    markAllNotificationsAsRead,
     runJob,
-    deleteJob
+    deleteJob,
+    addJob,
+    toggleNotifications,
+    clearAllNotifications
   };
 
   return (
