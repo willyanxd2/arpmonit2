@@ -22,7 +22,7 @@ interface JobFormData {
 
 function CreateJob() {
   const navigate = useNavigate();
-  const { networkInterfaces } = useApp();
+  const { networkInterfaces, fetchJobs } = useApp();
   
   const [formData, setFormData] = useState<JobFormData>({
     name: '',
@@ -99,8 +99,12 @@ function CreateJob() {
     setIsSubmitting(true);
     
     try {
-      await api.post('/jobs', formData);
+      const response = await api.post('/jobs', formData);
       toast.success('Job created successfully');
+      
+      // Refresh jobs list to show the new job immediately
+      await fetchJobs();
+      
       navigate('/jobs');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to create job');

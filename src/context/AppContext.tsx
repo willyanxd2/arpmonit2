@@ -49,6 +49,7 @@ interface AppContextType extends AppState {
   addJob: (job: Job) => void;
   toggleNotifications: () => void;
   clearAllNotifications: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -72,7 +73,8 @@ type Action =
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'MARK_ALL_NOTIFICATIONS_READ' }
   | { type: 'TOGGLE_NOTIFICATIONS' }
-  | { type: 'CLEAR_ALL_NOTIFICATIONS' };
+  | { type: 'CLEAR_ALL_NOTIFICATIONS' }
+  | { type: 'DELETE_NOTIFICATION'; payload: string };
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -119,6 +121,11 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, showNotifications: !state.showNotifications };
     case 'CLEAR_ALL_NOTIFICATIONS':
       return { ...state, notifications: [] };
+    case 'DELETE_NOTIFICATION':
+      return {
+        ...state,
+        notifications: state.notifications.filter(notification => notification.id !== action.payload)
+      };
     default:
       return state;
   }
@@ -168,7 +175,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const markAllNotificationsAsRead = async () => {
     try {
-      // Mark all unread notifications as read
       const unreadNotifications = state.notifications.filter(n => !n.read);
       await Promise.all(
         unreadNotifications.map(notification => 
@@ -184,8 +190,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const clearAllNotifications = async () => {
     try {
-      // This would need a backend endpoint to delete all notifications
-      // For now, just mark them all as read
       await markAllNotificationsAsRead();
       dispatch({ type: 'CLEAR_ALL_NOTIFICATIONS' });
       toast.success('All notifications cleared');
@@ -194,11 +198,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteNotification = async (id: string) => {
+    try {
+      // This would need a backend endpoint to delete individual notifications
+      // For now, just mark as read and remove from UI
+      await markNotificationAsRead(id);
+      dispatch({ type: 'DELETE_NOTIFICATION', payload: id });
+      toast.success('Notification deleted');
+    } catch (error) {
+      toast.error('Failed to delete notification');
+    }
+  };
+
   const runJob = async (id: string) => {
     try {
       await api.post(`/jobs/${id}/run`);
       toast.success('Job started successfully');
-      fetchJobs();
+      // Refresh jobs to update status
+      await fetchJobs();
     } catch (error) {
       toast.error('Failed to start job');
     }
@@ -247,7 +264,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteJob,
     addJob,
     toggleNotifications,
-    clearAllNotifications
+    clearAllNotifications,
+    deleteNotification
   };
 
   return (

@@ -25,7 +25,8 @@ function Layout({ children }: LayoutProps) {
     toggleNotifications, 
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    clearAllNotifications
+    clearAllNotifications,
+    deleteNotification
   } = useApp();
   
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -33,12 +34,18 @@ function Layout({ children }: LayoutProps) {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Activity },
     { path: '/jobs', label: 'Jobs', icon: Network },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const handleNotificationClick = async (notification: any) => {
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
     }
+  };
+
+  const handleDeleteNotification = async (e: React.MouseEvent, notificationId: string) => {
+    e.stopPropagation();
+    await deleteNotification(notificationId);
   };
 
   return (
@@ -91,7 +98,9 @@ function Layout({ children }: LayoutProps) {
               <h2 className="text-lg font-semibold text-white">
                 {location.pathname === '/' && 'Dashboard Overview'}
                 {location.pathname === '/jobs' && 'Job Management'}
-                {location.pathname.startsWith('/jobs/') && 'Job Details'}
+                {location.pathname === '/settings' && 'Application Settings'}
+                {location.pathname.startsWith('/jobs/') && !location.pathname.includes('/create') && 'Job Details'}
+                {location.pathname.includes('/create') && 'Create New Job'}
               </h2>
               <p className="text-sm text-dark-400">
                 Real-time network monitoring and device tracking
@@ -103,7 +112,7 @@ function Layout({ children }: LayoutProps) {
               <div className="relative">
                 <button 
                   onClick={toggleNotifications}
-                  className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
+                  className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-dark-300" />
                   {unreadCount > 0 && (
@@ -123,6 +132,7 @@ function Layout({ children }: LayoutProps) {
                           <button
                             onClick={markAllNotificationsAsRead}
                             className="text-xs text-neon-cyan hover:text-neon-cyan/80 transition-colors"
+                            title="Mark all as read"
                           >
                             <CheckCheck className="w-4 h-4" />
                           </button>
@@ -130,6 +140,7 @@ function Layout({ children }: LayoutProps) {
                         <button
                           onClick={clearAllNotifications}
                           className="text-xs text-neon-orange hover:text-neon-orange/80 transition-colors"
+                          title="Clear all notifications"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -148,7 +159,7 @@ function Layout({ children }: LayoutProps) {
                           <div
                             key={notification.id}
                             onClick={() => handleNotificationClick(notification)}
-                            className={`p-4 border-b border-dark-700 hover:bg-dark-800 cursor-pointer transition-colors ${
+                            className={`p-4 border-b border-dark-700 hover:bg-dark-800 cursor-pointer transition-colors relative group ${
                               !notification.read ? 'bg-dark-800/50' : ''
                             }`}
                           >
@@ -165,6 +176,13 @@ function Layout({ children }: LayoutProps) {
                                   {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                 </p>
                               </div>
+                              <button
+                                onClick={(e) => handleDeleteNotification(e, notification.id)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-neon-orange hover:text-neon-orange/80"
+                                title="Delete notification"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         ))
@@ -178,14 +196,6 @@ function Layout({ children }: LayoutProps) {
                   </div>
                 )}
               </div>
-
-              {/* Settings */}
-              <Link 
-                to="/settings"
-                className="p-2 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
-              >
-                <Settings className="w-5 h-5 text-dark-300" />
-              </Link>
             </div>
           </div>
         </header>

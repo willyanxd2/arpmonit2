@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import CreateJob from './pages/CreateJob';
+import Settings from './pages/Settings';
 import { AppProvider } from './context/AppContext';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/jobs/create" element={<CreateJob />} />
               <Route path="/jobs/:id" element={<JobDetail />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </Layout>
           <Toaster 

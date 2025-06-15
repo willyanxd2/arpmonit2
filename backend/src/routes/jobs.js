@@ -53,7 +53,9 @@ router.post('/', async (req, res) => {
     const job = new Job(req.body);
     await job.save();
     
-    res.status(201).json({ message: 'Job created successfully', id: job.id });
+    // Return the created job data
+    const createdJob = await Job.findById(job.id);
+    res.status(201).json(createdJob);
   } catch (error) {
     console.error('Error creating job:', error);
     res.status(500).json({ message: 'Failed to create job' });
@@ -66,6 +68,11 @@ router.put('/:id', async (req, res) => {
     const existingJob = await Job.findById(req.params.id);
     if (!existingJob) {
       return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Check if job is running
+    if (existingJob.status === 'running') {
+      return res.status(409).json({ message: 'Cannot edit job while it is running' });
     }
 
     // Validate interface and subnet if they're being updated
@@ -82,7 +89,9 @@ router.put('/:id', async (req, res) => {
     const job = new Job({ ...existingJob, ...req.body, id: req.params.id });
     await job.save();
     
-    res.json({ message: 'Job updated successfully' });
+    // Return the updated job data
+    const updatedJob = await Job.findById(req.params.id);
+    res.json(updatedJob);
   } catch (error) {
     console.error('Error updating job:', error);
     res.status(500).json({ message: 'Failed to update job' });
@@ -157,6 +166,44 @@ router.get('/:id/devices', async (req, res) => {
   } catch (error) {
     console.error('Error fetching known devices:', error);
     res.status(500).json({ message: 'Failed to fetch known devices' });
+  }
+});
+
+// Delete known device
+router.delete('/:id/devices/:deviceId', async (req, res) => {
+  try {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM known_devices WHERE id = ? AND job_id = ?');
+    const result = stmt.run(req.params.deviceId, req.params.id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    
+    res.json({ message: 'Device deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting device:', error);
+    res.status(500).json({ message: 'Failed to delete device' });
+  }
+});
+
+// Toggle device whitelist status
+router.patch('/:id/devices/:deviceId/whitelist', async (req, res) => {
+  try {
+    const db = getDatabase();
+    const { whitelisted } = req.body;
+    
+    const stmt = db.prepare('UPDATE known_devices SET whitelisted = ? WHERE id = ? AND job_id = ?');
+    const result = stmt.run(whitelisted ? 1 : 0, req.params.deviceId, req.params.id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    
+    res.json({ message: 'Device whitelist status updated successfully' });
+  } catch (error) {
+    console.error('Error updating device whitelist status:', error);
+    res.status(500).json({ message: 'Failed to update device whitelist status' });
   }
 });
 

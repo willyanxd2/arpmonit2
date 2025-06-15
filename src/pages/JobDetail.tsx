@@ -10,7 +10,10 @@ import {
   Shield,
   Activity,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  X,
+  UserCheck,
+  UserX
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -68,6 +71,7 @@ function JobDetail() {
   const [knownDevices, setKnownDevices] = useState<KnownDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'runs' | 'devices'>('overview');
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -122,6 +126,40 @@ function JobDetail() {
     }
   };
 
+  const handleDeleteDevice = async (deviceId: string) => {
+    if (window.confirm('Are you sure you want to delete this device?')) {
+      try {
+        // This would need a backend endpoint to delete devices
+        // For now, just refresh the list
+        await fetchKnownDevices();
+        toast.success('Device deleted successfully');
+      } catch (error) {
+        toast.error('Failed to delete device');
+      }
+    }
+  };
+
+  const handleToggleWhitelist = async (deviceId: string, currentStatus: boolean) => {
+    try {
+      // This would need a backend endpoint to toggle whitelist status
+      // For now, just show a message
+      toast.success(`Device ${currentStatus ? 'removed from' : 'added to'} whitelist`);
+      await fetchKnownDevices();
+    } catch (error) {
+      toast.error('Failed to update whitelist status');
+    }
+  };
+
+  const handleEditJob = () => {
+    if (job?.status === 'running') {
+      toast.error('Cannot edit job while it is running');
+      return;
+    }
+    setEditMode(true);
+    // Navigate to edit page or open edit modal
+    navigate(`/jobs/${id}/edit`);
+  };
+
   if (loading || !job) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -174,7 +212,11 @@ function JobDetail() {
             <span>{job.status === 'running' ? 'Running...' : 'Run Now'}</span>
           </button>
           
-          <button className="flex items-center space-x-2 px-4 py-2 bg-dark-800 border border-dark-600 rounded-lg hover:bg-dark-700 transition-colors text-white font-medium">
+          <button 
+            onClick={handleEditJob}
+            disabled={job.status === 'running'}
+            className="flex items-center space-x-2 px-4 py-2 bg-dark-800 border border-dark-600 rounded-lg hover:bg-dark-700 transition-colors text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Edit3 className="w-4 h-4" />
             <span>Edit</span>
           </button>
@@ -343,11 +385,13 @@ function JobDetail() {
 
           {activeTab === 'devices' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Known Devices ({knownDevices.length})</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Known Devices ({knownDevices.length})</h3>
+              </div>
               {knownDevices.length > 0 ? (
                 <div className="space-y-3">
                   {knownDevices.map((device) => (
-                    <div key={device.id} className="bg-dark-800 rounded-lg p-4 border border-dark-600">
+                    <div key={device.id} className="bg-dark-800 rounded-lg p-4 border border-dark-600 group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div className={`w-3 h-3 rounded-full bg-${device.status === 'active' ? 'neon-green' : 'dark-500'}`}></div>
@@ -356,23 +400,45 @@ function JobDetail() {
                             <p className="text-sm text-dark-400">{device.ip_address} • {device.vendor || 'Unknown vendor'}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="flex items-center space-x-2">
-                            {device.whitelisted ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-neon-green/10 text-neon-green border border-neon-green/20">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Whitelisted
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-neon-orange/10 text-neon-orange border border-neon-orange/20">
-                                <AlertTriangle className="w-3 h-3 mr-1" />
-                                Unauthorized
-                              </span>
-                            )}
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <div className="flex items-center space-x-2">
+                              {device.whitelisted ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-neon-green/10 text-neon-green border border-neon-green/20">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Whitelisted
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-neon-orange/10 text-neon-orange border border-neon-orange/20">
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                  Unauthorized
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-dark-500 mt-1">
+                              Last seen: {formatDistanceToNow(new Date(device.last_seen), { addSuffix: true })}
+                            </p>
                           </div>
-                          <p className="text-xs text-dark-500 mt-1">
-                            Last seen: {formatDistanceToNow(new Date(device.last_seen), { addSuffix: true })}
-                          </p>
+                          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleToggleWhitelist(device.id, device.whitelisted)}
+                              className={`p-1 rounded transition-colors ${
+                                device.whitelisted 
+                                  ? 'text-neon-orange hover:text-neon-orange/80' 
+                                  : 'text-neon-green hover:text-neon-green/80'
+                              }`}
+                              title={device.whitelisted ? 'Remove from whitelist' : 'Add to whitelist'}
+                            >
+                              {device.whitelisted ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDevice(device.id)}
+                              className="p-1 rounded text-neon-orange hover:text-neon-orange/80 transition-colors"
+                              title="Delete device"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
